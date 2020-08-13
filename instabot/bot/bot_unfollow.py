@@ -8,7 +8,7 @@ def unfollow(self, user_id):
 
     if not user_info:
         self.logger.info("Can't get user_id=%s info" % str(user_id))
-        return False  # No user_info
+        return False, 0  # No user_info
 
     username = user_info.get("username")
 
@@ -25,7 +25,7 @@ def unfollow(self, user_id):
         )
 
     if self.check_user(user_id, unfollowing=True):
-        return True  # whitelisted user
+        return True, 0  # whitelisted user
     if not self.reached_limit("unfollows"):
         if self.blocked_actions["unfollows"]:
             self.logger.warning("YOUR `UNFOLLOW` ACTION IS BLOCKED")
@@ -33,10 +33,11 @@ def unfollow(self, user_id):
                 self.logger.warning(
                     "blocked_actions_protection ACTIVE. " "Skipping `unfollow` action."
                 )
-                return False
+                return False, 0
         self.delay("unfollow")
-        _r = self.api.unfollow(user_id)
-        if _r == "feedback_required":
+        status_code: int
+        succeeded, status_code = self.api.unfollow(user_id)
+        if status_code == 600:
             self.logger.error("`Unfollow` action has been BLOCKED...!!!")
             if not self.blocked_actions_sleep:
                 if self.blocked_actions_protection:
@@ -68,8 +69,8 @@ def unfollow(self, user_id):
                     )
                     self.sleeping_actions["unfollows"] = True
                     time.sleep(self.blocked_actions_sleep_delay)
-            return False
-        if _r:
+            return False, status_code
+        if succeeded:
             if self.log_follow_unfollow:
                 msg = "Unfollowed `user_id` {} with username {}".format(
                     user_id, username
@@ -85,10 +86,10 @@ def unfollow(self, user_id):
             if self.blocked_actions_sleep and self.sleeping_actions["unfollows"]:
                 self.logger.info("`Unfollow` action is no longer sleeping.")
                 self.sleeping_actions["unfollows"] = False
-            return True
+            return True, status_code
     else:
         self.logger.info("Out of unfollows for today.")
-    return False
+        return False, 0
 
 
 def unfollow_users(self, user_ids):

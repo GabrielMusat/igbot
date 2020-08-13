@@ -325,7 +325,7 @@ class Bot(object):
         last = self.last.get("updated_following", now)
         if self._following is None or (now - last) > 7200:
             self.console_print("`bot.following` is empty, will download.", "green")
-            self._following = self.get_user_following(self.user_id)
+            self._following, status_code = self.get_user_following(self.user_id)
             self.last["updated_following"] = now
         return self._following
 

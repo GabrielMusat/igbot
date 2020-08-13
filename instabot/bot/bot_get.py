@@ -4,7 +4,7 @@
 """
 
 from tqdm import tqdm
-
+import typing as T
 # STORY
 
 
@@ -204,7 +204,7 @@ def get_geotag_users(self, geotag):
 
 def get_user_id_from_username(self, username):
     if username not in self._usernames:
-        self.api.search_username(username)
+        _, status_code = self.api.search_username(username)
         self.very_small_delay()
         if "user" in self.api.last_json:
             self._usernames[username] = str(self.api.last_json["user"]["pk"])
@@ -232,16 +232,16 @@ def get_user_info(self, user_id, use_cache=True):
     return self._user_infos[user_id]
 
 
-def get_user_followers(self, user_id, nfollows):
+def get_user_followers(self, user_id, nfollows) -> T.Tuple[T.List[str], int]:
     user_id = self.convert_to_user_id(user_id)
-    followers = self.api.get_total_followers(user_id, nfollows)
-    return [str(item["pk"]) for item in followers][::-1] if followers else []
+    followers, status_code = self.api.get_total_followers(user_id, nfollows)
+    return ([str(item["pk"]) for item in followers][::-1], status_code) if followers else ([], status_code)
 
 
-def get_user_following(self, user_id, nfollows=None):
+def get_user_following(self, user_id, nfollows=None) -> T.Tuple[T.List[str], int]:
     user_id = self.convert_to_user_id(user_id)
-    following = self.api.get_total_followings(user_id, nfollows)
-    return [str(item["pk"]) for item in following][::-1] if following else []
+    following, status_code = self.api.get_total_followings(user_id, nfollows)
+    return ([str(item["pk"]) for item in following][::-1], status_code) if following else ([], status_code)
 
 
 def get_comment_likers(self, comment_id):

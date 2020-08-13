@@ -24,5 +24,5 @@ bot.login(username=args.u, password=args.p, proxy=args.proxy)
 
 f = utils.file(args.filename)
 for username in args.users:
-    following = bot.get_user_following(username)
+    following, status_code = bot.get_user_following(username)
     f.save_list(following)

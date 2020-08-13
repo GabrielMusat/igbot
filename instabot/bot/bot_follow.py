@@ -11,7 +11,7 @@ def follow(self, user_id, check_user):
         msg = " ===> Going to follow `user_id`: {}.".format(user_id)
         self.console_print(msg)
     if check_user and not self.check_user(user_id):
-        return False
+        return False, 0
     if not self.reached_limit("follows"):
         if self.blocked_actions["follows"]:
             self.logger.warning("YOUR `FOLLOW` ACTION IS BLOCKED")
@@ -19,10 +19,11 @@ def follow(self, user_id, check_user):
                 self.logger.warning(
                     "blocked_actions_protection ACTIVE. " "Skipping `follow` action."
                 )
-                return False
+                return False, 0
         self.delay("follow")
-        _r = self.api.follow(user_id)
-        if _r == "feedback_required":
+        status_code: int
+        succeeded, status_code = self.api.follow(user_id)
+        if status_code == 600:
             self.logger.error("`Follow` action has been BLOCKED...!!!")
             if not self.blocked_actions_sleep:
                 if self.blocked_actions_protection:
@@ -51,8 +52,8 @@ def follow(self, user_id, check_user):
                     )
                     self.sleeping_actions["follows"] = True
                     time.sleep(self.blocked_actions_sleep_delay)
-            return False
-        if _r:
+            return False, status_code
+        if succeeded:
             if self.log_follow_unfollow:
                 msg = "Followed `user_id` {}.".format(user_id)
                 self.logger.info(msg)
@@ -66,10 +67,10 @@ def follow(self, user_id, check_user):
             if self.blocked_actions_sleep and self.sleeping_actions["follows"]:
                 self.logger.info("`Follow` action is no longer sleeping.")
                 self.sleeping_actions["follows"] = False
-            return True
+            return True, status_code
     else:
         self.logger.info("Out of follows for today.")
-    return False
+        return False, 0
 
 
 def follow_users(self, user_ids, nfollows=None):
@@ -149,7 +150,7 @@ def follow_following(self, user_id, nfollows=None):
     if not user_id:
         self.logger.info("User not found.")
         return
-    followings = self.get_user_following(user_id)
+    followings, status_code = self.get_user_following(user_id)
     if not followings:
         self.logger.info("{} not found / closed / has no following.".format(user_id))
     else:

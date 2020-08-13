@@ -10,6 +10,7 @@ import sys
 import time
 import uuid
 import secrets
+import typing as T
 import pytz
 import requests
 import requests.utils
@@ -510,7 +511,7 @@ class API(object):
         headers=None,
         extra_sig=None,
         timeout_minutes=None,
-    ):
+    ) -> T.Tuple[bool, int]:
         self.set_proxy()  # Only happens if `self.proxy`
         # TODO: fix the request_headers
         self.session.headers.update(config.REQUEST_HEADERS)
@@ -539,7 +540,7 @@ class API(object):
                 response = self.session.get(config.API_URL + endpoint)
         except Exception as e:
             self.logger.warning(str(e))
-            return False
+            return False, 0
 
         self.last_response = response
         if post is not None:
@@ -554,9 +555,9 @@ class API(object):
         if response.status_code == 200:
             try:
                 self.last_json = json.loads(response.text)
-                return True
+                return True, response.status_code
             except JSONDecodeError:
-                return False
+                return False, response.status_code
         else:
             self.logger.debug(
                 "Responsecode indicates error; response content: {}".format(
@@ -583,7 +584,7 @@ class API(object):
                         self.last_json = json.loads(response.text)
                     except Exception:
                         pass
-                    return "feedback_required"
+                    return False, 600
             except ValueError:
                 self.logger.error(
                     "Error checking for `feedback_required`, "
@@ -637,7 +638,7 @@ class API(object):
                     except Exception:
                         self.logger.error("Error unknown send request 400 2FA")
                         pass
-                    return self.two_factor_auth()
+                    return self.two_factor_auth(), response.status_code
                 # End of Interactive Two-Factor Authentication
                 else:
                     msg = "Instagram's error message: {}"
@@ -653,7 +654,7 @@ class API(object):
             except Exception:
                 self.logger.error("Error unknown send request")
                 pass
-            return False
+            return False, response.status_code
 
     @property
     def cookie_dict(self):
@@ -1402,7 +1403,7 @@ class API(object):
         usernames=False,
         to_file=None,
         overwrite=False,
-    ):
+    ) -> T.Tuple[T.List[str], int]:
         from io import StringIO
 
         if which == "followers":
@@ -1411,6 +1412,8 @@ class API(object):
         elif which == "followings":
             key = "following_count"
             get = self.get_user_followings
+        else:
+            raise Exception("which variable not referenced")
 
         sleep_track = 0
         result = []
@@ -1426,7 +1429,7 @@ class API(object):
                     "operation. This will take a while.\n"
                 )
         else:
-            return False
+            return [], 0
         if filter_business:
             print(
                 "--> You are going to filter business accounts. "
@@ -1436,7 +1439,7 @@ class API(object):
             if os.path.isfile(to_file):
                 if not overwrite:
                     print("File `{}` already exists. Not overwriting.".format(to_file))
-                    return False
+                    return [], 0
                 else:
                     print("Overwriting file `{}`".format(to_file))
             with open(to_file, "w"):
@@ -1444,7 +1447,8 @@ class API(object):
         desc = "Getting {} of {}".format(which, user_id)
         with tqdm(total=total, desc=desc, leave=True) as pbar:
             while True:
-                get(user_id, next_max_id)
+                status_code: int
+                succeeded, status_code = get(user_id, next_max_id)
                 last_json = self.last_json
                 try:
                     with open(to_file, "a") if to_file is not None else StringIO() as f:
@@ -1476,20 +1480,20 @@ class API(object):
                                 time.sleep(sleep_time)
                                 sleep_track = 0
                     if not last_json["users"] or len(result) >= total:
-                        return result[:total]
+                        return result[:total], status_code
                 except Exception as e:
                     print("ERROR: {}".format(e))
-                    return result[:total]
+                    return result[:total], status_code
 
                 if last_json["big_list"] is False:
-                    return result[:total]
+                    return result[:total], status_code
 
                 next_max_id = last_json.get("next_max_id", "")
 
     def get_total_followers(self, user_id, amount=None):
         return self.get_total_followers_or_followings(user_id, amount, "followers")
 
-    def get_total_followings(self, user_id, amount=None):
+    def get_total_followings(self, user_id, amount=None) -> T.Tuple[T.List[str], int]:
         return self.get_total_followers_or_followings(user_id, amount, "followings")
 
     def get_total_user_feed(self, user_id, min_timestamp=None):
